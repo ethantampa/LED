@@ -9,7 +9,6 @@
   <meta name="theme-color" content="#0a0c0f" />
   <title>ESP32 Control</title>
 
-  <!-- PWA Manifest inline via JS (no separate file needed) -->
   <script>
     const manifest = {
       name: "ESP32 Control Panel",
@@ -37,16 +36,17 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green: #00ffa0;
-      --blue: #00c8ff;
-      --red: #ff4060;
-      --bg: #0a0c0f;
-      --panel: #0e1117;
+      --green:  #00ffa0;
+      --blue:   #00c8ff;
+      --red:    #ff4060;
+      --yellow: #ffc040;
+      --bg:     #0a0c0f;
+      --panel:  #0e1117;
       --border: #1e2a3a;
-      --text: #e0e6f0;
-      --dim: #4a6080;
+      --text:   #e0e6f0;
+      --dim:    #4a6080;
       --dimmer: #2a3a50;
-      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-top:    env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
@@ -60,404 +60,271 @@
       overflow: hidden;
     }
 
-    /* ── App shell ── */
     #app {
       height: 100dvh;
-      display: flex;
-      flex-direction: column;
+      display: flex; flex-direction: column;
       padding-top: var(--safe-top);
       padding-bottom: var(--safe-bottom);
-      position: relative;
-      overflow: hidden;
+      position: relative; overflow: hidden;
     }
 
-    /* Grid background */
     #app::before {
       content: '';
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       background:
         repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,255,160,0.025) 40px),
         repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,255,160,0.025) 40px);
-      pointer-events: none;
-      z-index: 0;
+      pointer-events: none; z-index: 0;
     }
 
-    /* Corner decorations */
-    .corner {
-      position: fixed;
-      width: 40px;
-      height: 40px;
-      opacity: 0.35;
-      z-index: 1;
-      pointer-events: none;
-    }
-    .corner-tl { top: calc(var(--safe-top) + 12px); left: 12px; border-top: 2px solid var(--green); border-left: 2px solid var(--green); }
-    .corner-tr { top: calc(var(--safe-top) + 12px); right: 12px; border-top: 2px solid var(--green); border-right: 2px solid var(--green); }
-    .corner-bl { bottom: calc(var(--safe-bottom) + 12px); left: 12px; border-bottom: 2px solid var(--green); border-left: 2px solid var(--green); }
-    .corner-br { bottom: calc(var(--safe-bottom) + 12px); right: 12px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); }
+    .corner { position: fixed; width: 40px; height: 40px; opacity: 0.35; z-index: 1; pointer-events: none; }
+    .corner-tl { top: calc(var(--safe-top) + 12px);     left: 12px;  border-top: 2px solid var(--green); border-left: 2px solid var(--green); }
+    .corner-tr { top: calc(var(--safe-top) + 12px);     right: 12px; border-top: 2px solid var(--green); border-right: 2px solid var(--green); }
+    .corner-bl { bottom: calc(var(--safe-bottom)+12px); left: 12px;  border-bottom: 2px solid var(--green); border-left: 2px solid var(--green); }
+    .corner-br { bottom: calc(var(--safe-bottom)+12px); right: 12px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); }
 
     /* ── Header ── */
     .header {
-      position: relative;
-      z-index: 10;
+      position: relative; z-index: 10;
       padding: 16px 20px 14px;
       border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      background: var(--panel);
-      flex-shrink: 0;
+      display: flex; align-items: center; gap: 14px;
+      background: var(--panel); flex-shrink: 0;
     }
-
     .header::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
       background: linear-gradient(90deg, transparent, var(--green), var(--blue), transparent);
     }
 
     .status-dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
+      width: 9px; height: 9px; border-radius: 50%;
       background: var(--green);
       box-shadow: 0 0 8px var(--green), 0 0 16px rgba(0,255,160,0.5);
-      animation: pulse 2s ease-in-out infinite;
-      flex-shrink: 0;
+      animation: pulse 2s ease-in-out infinite; flex-shrink: 0;
     }
-    .status-dot.busy {
-      background: var(--blue);
-      box-shadow: 0 0 8px var(--blue);
-      animation: spin-glow 1s linear infinite;
-    }
-    .status-dot.error {
-      background: var(--red);
-      box-shadow: 0 0 8px var(--red);
-      animation: none;
-    }
-
+    .status-dot.busy  { background: var(--blue);   box-shadow: 0 0 8px var(--blue);  animation: pulse 0.6s ease-in-out infinite; }
+    .status-dot.error { background: var(--red);    box-shadow: 0 0 8px var(--red);   animation: none; }
+    .status-dot.off   { background: var(--dimmer); box-shadow: none;                 animation: none; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-    @keyframes spin-glow { 0%{opacity:1} 50%{opacity:0.5} 100%{opacity:1} }
 
     .header-text { flex: 1; min-width: 0; }
-    .header-text h1 {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
+    .header-text h1 { font-size: 18px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
     .header-text p {
       font-family: 'Share Tech Mono', monospace;
-      font-size: 9px;
-      color: var(--dim);
-      letter-spacing: 1px;
-      margin-top: 1px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 9px; color: var(--dim); letter-spacing: 1px; margin-top: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
     .settings-btn {
-      width: 40px;
-      height: 40px;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--dim);
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-      flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
+      width: 40px; height: 40px;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--dim); font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; flex-shrink: 0;
     }
     .settings-btn:active { background: rgba(0,255,160,0.05); border-color: var(--green); color: var(--green); }
- 
+
     /* ── Scrollable body ── */
     .body {
-      flex: 1;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      position: relative;
-      z-index: 2;
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      position: relative; z-index: 2;
       padding: 20px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 22px;
+      display: flex; flex-direction: column; gap: 22px;
     }
 
-    /* ── Section label ── */
     .section-label {
-      font-size: 9px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--dim);
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--dim); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
     }
-    .section-label::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-    /* ── Program buttons ── */
-    .btn-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
+    /* ── 3-column program buttons ── */
+    .btn-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 
     .ctrl-btn {
       position: relative;
-      padding: 20px 16px;
-      background: #111820;
-      border: 1px solid var(--border);
+      padding: 16px 10px;
+      background: #111820; border: 1px solid var(--border);
       color: var(--text);
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 5px;
-      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+      font-family: 'Rajdhani', sans-serif; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+      display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+      clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
       -webkit-tap-highlight-color: transparent;
-      transition: all 0.12s;
-      width: 100%;
-      text-align: left;
-      overflow: hidden;
-      min-height: 80px;
+      transition: all 0.12s; width: 100%; text-align: left;
+      overflow: hidden; min-height: 72px;
     }
-
-    .ctrl-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      transition: opacity 0.15s;
-    }
-    .btn-a::before { background: linear-gradient(135deg, rgba(0,255,160,0.08), transparent); }
-    .btn-b::before { background: linear-gradient(135deg, rgba(0,200,255,0.08), transparent); }
-
+    .ctrl-btn::before { content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity 0.15s; }
+    .btn-a::before  { background: linear-gradient(135deg, rgba(0,255,160,0.08), transparent); }
+    .btn-b::before  { background: linear-gradient(135deg, rgba(0,200,255,0.08), transparent); }
+    .btn-df::before { background: linear-gradient(135deg, rgba(255,192,64,0.08), transparent); }
     .ctrl-btn:active::before { opacity: 1; }
     .ctrl-btn:active { transform: scale(0.97); }
+    .ctrl-btn.loading { opacity: 0.55; pointer-events: none; }
 
-    .ctrl-btn.loading {
-      opacity: 0.55;
-      pointer-events: none;
+    .btn-id { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 1px; }
+    .btn-a  .btn-id { color: var(--green); }
+    .btn-b  .btn-id { color: var(--blue); }
+    .btn-df .btn-id { color: var(--yellow); }
+    .btn-label { font-size: 14px; line-height: 1.2; }
+
+    /* ── Power button ── */
+    .power-btn {
+      position: relative; padding: 14px 16px;
+      background: rgba(255,64,96,0.06); border: 1px solid rgba(255,64,96,0.25);
+      color: var(--red);
+      font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+      cursor: pointer; width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      -webkit-tap-highlight-color: transparent; transition: all 0.12s;
     }
-
-    .btn-id {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 1px;
-    }
-    .btn-a .btn-id { color: var(--green); }
-    .btn-b .btn-id { color: var(--blue); }
-
-    .btn-label { font-size: 17px; }
+    .power-btn:active  { background: rgba(255,64,96,0.14); border-color: var(--red); }
+    .power-btn:disabled { opacity: 0.35; pointer-events: none; }
+    .power-icon { font-size: 16px; }
 
     /* ── Message input ── */
-    .msg-row {
-      display: flex;
-      gap: 0;
-    }
-
+    .msg-row { display: flex; }
     .msg-input {
-      flex: 1;
-      padding: 16px 14px;
-      background: #080b0f;
-      border: 1px solid var(--border);
-      border-right: none;
-      color: var(--text);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 14px;
-      outline: none;
-      -webkit-appearance: none;
-      border-radius: 0;
-      letter-spacing: 0.5px;
-      transition: border-color 0.15s;
-      min-width: 0;
+      flex: 1; padding: 16px 14px;
+      background: #080b0f; border: 1px solid var(--border); border-right: none;
+      color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 14px;
+      outline: none; -webkit-appearance: none; border-radius: 0;
+      letter-spacing: 0.5px; transition: border-color 0.15s; min-width: 0;
     }
     .msg-input::placeholder { color: var(--dimmer); }
     .msg-input:focus { border-color: rgba(0,255,160,0.3); }
 
     .send-btn {
       padding: 16px 20px;
-      background: rgba(0,255,160,0.08);
-      border: 1px solid rgba(0,255,160,0.3);
-      color: var(--green);
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      white-space: nowrap;
-      -webkit-tap-highlight-color: transparent;
-      transition: all 0.12s;
-      flex-shrink: 0;
+      background: rgba(0,255,160,0.08); border: 1px solid rgba(0,255,160,0.3);
+      color: var(--green); font-family: 'Rajdhani', sans-serif;
+      font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.12s;
     }
-    .send-btn:active { background: rgba(0,255,160,0.18); }
+    .send-btn:active   { background: rgba(0,255,160,0.18); }
     .send-btn:disabled { opacity: 0.3; pointer-events: none; }
 
     /* ── Log ── */
     .log-box {
-      background: #080b0f;
-      border: 1px solid var(--border);
-      padding: 12px;
-      max-height: 180px;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 11px;
+      background: #080b0f; border: 1px solid var(--border);
+      padding: 12px; max-height: 180px;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      font-family: 'Share Tech Mono', monospace; font-size: 11px;
     }
-
     .log-entry {
-      display: flex;
-      gap: 10px;
-      padding: 4px 0;
-      border-bottom: 1px solid #0a0d11;
-      animation: fadeIn 0.2s ease;
+      display: flex; gap: 10px; padding: 4px 0;
+      border-bottom: 1px solid #0a0d11; animation: fadeIn 0.2s ease;
     }
     @keyframes fadeIn { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:none} }
-
-    .log-time { color: var(--dimmer); flex-shrink: 0; }
-    .log-ok   { color: var(--green); }
-    .log-err  { color: var(--red); }
-    .log-info { color: var(--blue); }
+    .log-time  { color: var(--dimmer); flex-shrink: 0; }
+    .log-ok    { color: var(--green); }
+    .log-err   { color: var(--red); }
+    .log-info  { color: var(--blue); }
+    .log-warn  { color: var(--yellow); }
     .log-empty { color: var(--dimmer); font-style: italic; }
 
-    /* ── IP footer ── */
     .ip-tag {
       font-family: 'Share Tech Mono', monospace;
-      font-size: 9px;
-      color: var(--dimmer);
-      text-align: center;
-      padding: 10px 0 4px;
-      letter-spacing: 1px;
-      flex-shrink: 0;
+      font-size: 9px; color: var(--dimmer);
+      text-align: center; padding: 10px 0 4px; letter-spacing: 1px;
     }
 
     /* ── Spinner ── */
     .spinner {
-      display: inline-block;
-      width: 9px;
-      height: 9px;
-      border: 1.5px solid rgba(0,255,160,0.2);
-      border-top-color: var(--green);
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-      vertical-align: middle;
-      margin-right: 5px;
+      display: inline-block; width: 9px; height: 9px;
+      border: 1.5px solid rgba(0,255,160,0.2); border-top-color: var(--green);
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+      vertical-align: middle; margin-right: 5px;
     }
-    .spinner.blue {
-      border-color: rgba(0,200,255,0.2);
-      border-top-color: var(--blue);
-    }
+    .spinner.blue   { border-color: rgba(0,200,255,0.2);  border-top-color: var(--blue); }
+    .spinner.yellow { border-color: rgba(255,192,64,0.2); border-top-color: var(--yellow); }
     @keyframes spin { to{transform:rotate(360deg)} }
 
     /* ── Settings overlay ── */
     .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.85);
-      z-index: 100;
-      display: flex;
-      align-items: flex-end;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      z-index: 100; display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
     }
-    .overlay.open {
-      opacity: 1;
-      pointer-events: all;
-    }
+    .overlay.open { opacity: 1; pointer-events: all; }
 
     .settings-sheet {
-      width: 100%;
-      background: var(--panel);
+      width: 100%; background: var(--panel);
       border-top: 1px solid var(--border);
-      padding: 0 20px calc(var(--safe-bottom) + 20px);
+      padding: 0 20px calc(var(--safe-bottom) + 24px);
       transform: translateY(100%);
-      transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+      transition: transform 0.25s cubic-bezier(0.32,0.72,0,1);
+      max-height: 90dvh; overflow-y: auto; -webkit-overflow-scrolling: touch;
     }
-    .overlay.open .settings-sheet {
-      transform: translateY(0);
-    }
+    .overlay.open .settings-sheet { transform: translateY(0); }
 
     .sheet-handle {
-      width: 36px;
-      height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      margin: 12px auto 20px;
+      width: 36px; height: 4px; background: var(--border);
+      border-radius: 2px; margin: 12px auto 20px;
     }
-
     .sheet-title {
-      font-size: 11px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--dim);
-      margin-bottom: 16px;
+      font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--dim); margin-bottom: 20px;
     }
 
+    .settings-group { margin-bottom: 24px; }
+    .settings-group-label {
+      font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--dimmer); margin-bottom: 10px;
+      padding-bottom: 6px; border-bottom: 1px solid var(--border);
+    }
+
+    .settings-field { margin-bottom: 14px; }
     .settings-field label {
-      display: block;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 10px;
-      color: var(--dim);
-      letter-spacing: 1px;
-      margin-bottom: 6px;
+      display: block; font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; color: var(--dim); letter-spacing: 1px; margin-bottom: 6px;
     }
-
     .settings-field input {
-      width: 100%;
-      padding: 14px;
-      background: #080b0f;
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 14px;
-      outline: none;
-      -webkit-appearance: none;
-      border-radius: 0;
-      letter-spacing: 0.5px;
+      width: 100%; padding: 14px;
+      background: #080b0f; border: 1px solid var(--border);
+      color: var(--text); font-family: 'Share Tech Mono', monospace;
+      font-size: 14px; outline: none; -webkit-appearance: none;
+      border-radius: 0; letter-spacing: 0.5px;
     }
     .settings-field input:focus { border-color: rgba(0,255,160,0.3); }
 
+    .time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    /* Toggle switch */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0; border-bottom: 1px solid var(--border); margin-bottom: 14px;
+    }
+    .toggle-label { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text); letter-spacing: 0.5px; }
+    .toggle-sub   { font-size: 9px; color: var(--dim); margin-top: 2px; }
+
+    .toggle { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: var(--dimmer); border-radius: 13px;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: ''; position: absolute;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--text); top: 3px; left: 3px; transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--green); }
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
+
     .save-btn {
-      margin-top: 16px;
-      width: 100%;
-      padding: 16px;
-      background: rgba(0,255,160,0.1);
-      border: 1px solid rgba(0,255,160,0.4);
-      color: var(--green);
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
+      width: 100%; padding: 16px;
+      background: rgba(0,255,160,0.1); border: 1px solid rgba(0,255,160,0.4);
+      color: var(--green); font-family: 'Rajdhani', sans-serif;
+      font-size: 14px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+      cursor: pointer; margin-top: 4px;
     }
     .save-btn:active { background: rgba(0,255,160,0.2); }
 
-    .close-overlay {
-      position: absolute;
-      inset: 0;
-      bottom: auto;
-      height: calc(100% - 260px);
-    }
+    .close-overlay { position: absolute; inset: 0; bottom: auto; height: 15%; }
   </style>
 </head>
 <body>
@@ -482,8 +349,8 @@
 
     <!-- Programs -->
     <div>
-      <div class="section-label">Execution</div>
-      <div class="btn-row">
+      <div class="section-label">Programs</div>
+      <div class="btn-row-3">
         <button class="ctrl-btn btn-a" id="btnA" onclick="runA()">
           <span class="btn-id" id="btnAId">0x01</span>
           <span class="btn-label">Weather</span>
@@ -492,7 +359,20 @@
           <span class="btn-id" id="btnBId">0x02</span>
           <span class="btn-label">Flight Data</span>
         </button>
+        <button class="ctrl-btn btn-df" id="btnDF" onclick="runDefault()">
+          <span class="btn-id" id="btnDFId">AUTO</span>
+          <span class="btn-label">Default</span>
+        </button>
       </div>
+    </div>
+
+    <!-- Power -->
+    <div>
+      <div class="section-label">Power</div>
+      <button class="power-btn" id="powerBtn" onclick="boardOff()">
+        <span class="power-icon">⏻</span>
+        <span>Turn Board Off</span>
+      </button>
     </div>
 
     <!-- Message -->
@@ -500,14 +380,9 @@
       <div class="section-label">Display Output</div>
       <div class="msg-row">
         <input
-          class="msg-input"
-          id="msgInput"
-          type="text"
+          class="msg-input" id="msgInput" type="text"
           placeholder="Enter message to display..."
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
           onkeydown="if(event.key==='Enter') sendMsg()"
         />
         <button class="send-btn" id="sendBtn" onclick="sendMsg()">Send</button>
@@ -530,113 +405,215 @@
     <div class="close-overlay" onclick="closeSettings()"></div>
     <div class="settings-sheet">
       <div class="sheet-handle"></div>
-      <div class="sheet-title">Network Settings</div>
-      <div class="settings-field">
-        <label>ESP32 IP ADDRESS</label>
-        <input type="text" id="ipInput" placeholder="http://10.0.0.150" inputmode="url" />
+      <div class="sheet-title">Settings</div>
+
+      <!-- Network -->
+      <div class="settings-group">
+        <div class="settings-group-label">Network</div>
+        <div class="settings-field">
+          <label>ESP32 IP ADDRESS</label>
+          <input type="text" id="ipInput" placeholder="http://10.0.0.150" inputmode="url" />
+        </div>
       </div>
+
+      <!-- Sleep Schedule -->
+      <div class="settings-group">
+        <div class="settings-group-label">Sleep Schedule</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Auto Sleep</div>
+            <div class="toggle-sub">Board turns off and on automatically</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="sleepEnabled" />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="time-row">
+          <div class="settings-field">
+            <label>SLEEP TIME</label>
+            <input type="time" id="sleepTime" value="23:00" />
+          </div>
+          <div class="settings-field">
+            <label>WAKE TIME</label>
+            <input type="time" id="wakeTime" value="07:00" />
+          </div>
+        </div>
+      </div>
+
       <button class="save-btn" onclick="saveSettings()">Save &amp; Close</button>
     </div>
   </div>
 </div>
 
 <script>
-  // ── State ──────────────────────────────────────────────────────────────────
-  const DEFAULT_IP = "http://10.0.0.150";
-  let ESP32_IP = localStorage.getItem("esp32_ip") || DEFAULT_IP;
-  let loading = null;
+  // ── Persisted state ────────────────────────────────────────────────────────
+  const DEFAULT_IP  = "http://10.0.0.150";
+  let ESP32_IP      = localStorage.getItem("esp32_ip")     || DEFAULT_IP;
+  let sleepEnabled  = localStorage.getItem("sleepEnabled") === "true";
+  let sleepTime     = localStorage.getItem("sleepTime")    || "23:00";
+  let wakeTime      = localStorage.getItem("wakeTime")     || "07:00";
+  let loading       = null;
+  let boardIsOff    = false;
+  let sleepTimeouts = [];
 
   // ── Init ───────────────────────────────────────────────────────────────────
-  document.getElementById("ipTag").textContent = ESP32_IP + " · PORT 80";
-  document.getElementById("headerSub").textContent =
-    "DEVICE INTERFACE · " + ESP32_IP.replace("http://", "");
+  updateIPDisplay();
+  if (sleepEnabled) scheduleSleep();
 
   // ── Logging ────────────────────────────────────────────────────────────────
   function addLog(text, type = "ok") {
     const box = document.getElementById("logBox");
     const empty = box.querySelector(".log-empty");
     if (empty) empty.closest(".log-entry").remove();
-
     const now = new Date().toTimeString().slice(0, 8);
     const entry = document.createElement("div");
     entry.className = "log-entry";
-    entry.innerHTML = `<span class="log-time">${now}</span><span class="log-${type}">${text}</span>`;
+    entry.innerHTML = `<span class="log-time">${now}</span><span class="log-${type}">${escHtml(text)}</span>`;
     box.insertBefore(entry, box.firstChild);
-
-    // Keep max 20
     while (box.children.length > 20) box.removeChild(box.lastChild);
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
   // ── Status dot ─────────────────────────────────────────────────────────────
   function setStatus(state) {
-    const dot = document.getElementById("statusDot");
-    dot.className = "status-dot" + (state ? " " + state : "");
+    document.getElementById("statusDot").className = "status-dot" + (state ? " " + state : "");
   }
 
-  // ── Button state ───────────────────────────────────────────────────────────
+  // ── Button lock/unlock ─────────────────────────────────────────────────────
   function setLoading(id) {
     loading = id;
-    const btnA = document.getElementById("btnA");
-    const btnB = document.getElementById("btnB");
-    const btnAId = document.getElementById("btnAId");
-    const btnBId = document.getElementById("btnBId");
-    const sendBtn = document.getElementById("sendBtn");
+    const ids = { A: "btnA", B: "btnB", DF: "btnDF" };
+    const labels = { A: "0x01", B: "0x02", DF: "AUTO" };
+    const spinners = { A: "", B: "blue", DF: "yellow" };
 
-    if (id) {
+    Object.keys(ids).forEach(k => {
+      const btn = document.getElementById(ids[k]);
+      const lbl = document.getElementById(ids[k] + "Id");
+      btn.disabled = !!id;
+      btn.classList.remove("loading");
+      lbl.textContent = labels[k];
+    });
+
+    document.getElementById("sendBtn").disabled  = !!id;
+    document.getElementById("powerBtn").disabled = !!id;
+
+    if (id && ids[id]) {
       setStatus("busy");
-      btnA.disabled = true;
-      btnB.disabled = true;
-      sendBtn.disabled = true;
-      if (id === "A") {
-        btnA.classList.add("loading");
-        btnAId.innerHTML = '<span class="spinner"></span>RUNNING';
-      } else if (id === "B") {
-        btnB.classList.add("loading");
-        btnBId.innerHTML = '<span class="spinner blue"></span>RUNNING';
-      }
-    } else {
-      setStatus("");
-      btnA.disabled = false;
-      btnB.disabled = false;
-      sendBtn.disabled = false;
-      btnA.classList.remove("loading");
-      btnB.classList.remove("loading");
-      btnAId.textContent = "0x01";
-      btnBId.textContent = "0x02";
+      const btn = document.getElementById(ids[id]);
+      const lbl = document.getElementById(ids[id] + "Id");
+      const sc  = spinners[id];
+      btn.classList.add("loading");
+      lbl.innerHTML = `<span class="spinner ${sc}"></span>RUNNING`;
+    } else if (!id) {
+      setStatus(boardIsOff ? "off" : "");
     }
   }
 
   // ── Fetch helper ───────────────────────────────────────────────────────────
-  async function request(label, url) {
-    setLoading(label === "PROG_A" ? "A" : label === "PROG_B" ? "B" : "MSG");
+  async function request(label, url, loadingId) {
+    setLoading(loadingId);
     try {
-      const res = await fetch(url);
+      const res  = await fetch(url);
       const data = await res.json();
       addLog(label + " → " + data.status, "ok");
-    } catch (e) {
+      return true;
+    } catch {
       addLog(label + " → connection failed", "err");
       setStatus("error");
-      setTimeout(() => setStatus(""), 2000);
+      setTimeout(() => setStatus(boardIsOff ? "off" : ""), 2000);
+      return false;
     } finally {
       setLoading(null);
     }
   }
 
-  // ── Actions ────────────────────────────────────────────────────────────────
-  function runA() { request("PROG_A", ESP32_IP + "/api/programA"); }
-  function runB() { request("PROG_B", ESP32_IP + "/api/programB"); }
+  // ── Program actions ────────────────────────────────────────────────────────
+  function runA() {
+    boardIsOff = false;
+    request("WEATHER", `${ESP32_IP}/api/programA`, "A");
+  }
+  function runB() {
+    boardIsOff = false;
+    request("FLIGHT DATA", `${ESP32_IP}/api/programB`, "B");
+  }
+  function runDefault() {
+    boardIsOff = false;
+    request("DEFAULT MODE", `${ESP32_IP}/api/programDefault`, "DF");
+  }
 
+  // ── Board off ──────────────────────────────────────────────────────────────
+  async function boardOff() {
+    if (loading) return;
+    const ok = await request("BOARD OFF", `${ESP32_IP}/api/boardOff`, "A");
+    if (ok) {
+      boardIsOff = true;
+      setStatus("off");
+    }
+  }
+
+  // ── Message send ───────────────────────────────────────────────────────────
   function sendMsg() {
     const input = document.getElementById("msgInput");
     const msg = input.value.trim();
     if (!msg || loading) return;
     input.value = "";
-    request('MSG:"' + msg + '"', ESP32_IP + "/api/display?message=" + encodeURIComponent(msg));
+    boardIsOff = false;
+    request(`MSG: "${msg}"`, `${ESP32_IP}/api/display?message=${encodeURIComponent(msg)}`, "A");
   }
 
-  // ── Settings ───────────────────────────────────────────────────────────────
+  // ── Sleep schedule ─────────────────────────────────────────────────────────
+  function scheduleSleep() {
+    // Clear any existing timers
+    sleepTimeouts.forEach(t => clearTimeout(t));
+    sleepTimeouts = [];
+    if (!sleepEnabled) return;
+
+    function msUntil(timeStr) {
+      const [h, m] = timeStr.split(":").map(Number);
+      const now    = new Date();
+      const target = new Date(now);
+      target.setHours(h, m, 0, 0);
+      if (target <= now) target.setDate(target.getDate() + 1);
+      return target - now;
+    }
+
+    const fmt = t => {
+      const [h, m] = t.split(":");
+      const ampm = +h >= 12 ? "PM" : "AM";
+      return `${+h % 12 || 12}:${m} ${ampm}`;
+    };
+
+    // Sleep timer
+    sleepTimeouts.push(setTimeout(() => {
+      addLog(`Auto sleep (${fmt(sleepTime)}) → board off`, "warn");
+      fetch(`${ESP32_IP}/api/boardOff`).catch(() => {});
+      boardIsOff = true;
+      setStatus("off");
+      scheduleSleep(); // re-schedule for next day
+    }, msUntil(sleepTime)));
+
+    // Wake timer
+    sleepTimeouts.push(setTimeout(() => {
+      addLog(`Auto wake (${fmt(wakeTime)}) → default mode`, "info");
+      fetch(`${ESP32_IP}/api/programDefault`).catch(() => {});
+      boardIsOff = false;
+      setStatus("");
+      scheduleSleep(); // re-schedule for next day
+    }, msUntil(wakeTime)));
+
+    addLog(`Schedule: sleep ${fmt(sleepTime)}, wake ${fmt(wakeTime)}`, "info");
+  }
+
+  // ── Settings open/close ────────────────────────────────────────────────────
   function openSettings() {
-    document.getElementById("ipInput").value = ESP32_IP;
+    document.getElementById("ipInput").value        = ESP32_IP;
+    document.getElementById("sleepEnabled").checked = sleepEnabled;
+    document.getElementById("sleepTime").value      = sleepTime;
+    document.getElementById("wakeTime").value       = wakeTime;
     document.getElementById("settingsOverlay").classList.add("open");
   }
 
@@ -645,22 +622,48 @@
   }
 
   function saveSettings() {
-    const val = document.getElementById("ipInput").value.trim().replace(/\/$/, "");
-    if (val) {
-      ESP32_IP = val.startsWith("http") ? val : "http://" + val;
-      localStorage.setItem("esp32_ip", ESP32_IP);
-      document.getElementById("ipTag").textContent = ESP32_IP + " · PORT 80";
-      document.getElementById("headerSub").textContent =
-        "DEVICE INTERFACE · " + ESP32_IP.replace("http://", "");
-      addLog("IP updated → " + ESP32_IP, "info");
+    // Save IP
+    const ipVal = document.getElementById("ipInput").value.trim().replace(/\/$/, "");
+    if (ipVal) {
+      const newIP = ipVal.startsWith("http") ? ipVal : "http://" + ipVal;
+      if (newIP !== ESP32_IP) {
+        ESP32_IP = newIP;
+        localStorage.setItem("esp32_ip", ESP32_IP);
+        updateIPDisplay();
+        addLog("IP updated → " + ESP32_IP, "info");
+      }
     }
+
+    // Save sleep settings
+    sleepEnabled = document.getElementById("sleepEnabled").checked;
+    sleepTime    = document.getElementById("sleepTime").value;
+    wakeTime     = document.getElementById("wakeTime").value;
+    localStorage.setItem("sleepEnabled", sleepEnabled);
+    localStorage.setItem("sleepTime",    sleepTime);
+    localStorage.setItem("wakeTime",     wakeTime);
+
+    // Push schedule to ESP32
+    const [sh, sm] = sleepTime.split(":").map(Number);
+    const [wh, wm] = wakeTime.split(":").map(Number);
+    const enParam  = sleepEnabled ? 1 : 0;
+    fetch(`${ESP32_IP}/api/setSleep?sleepH=${sh}&sleepM=${sm}&wakeH=${wh}&wakeM=${wm}&enabled=${enParam}`)
+      .then(r => r.json())
+      .then(d => addLog("Board schedule → " + d.status, "info"))
+      .catch(() => addLog("Board offline — schedule saved locally only", "warn"));
+
+    scheduleSleep();
     closeSettings();
   }
 
-  // ── Service Worker (for offline/installable PWA) ──────────────────────────
+  function updateIPDisplay() {
+    document.getElementById("ipTag").textContent     = ESP32_IP + " · PORT 80";
+    document.getElementById("headerSub").textContent = "DEVICE INTERFACE · " + ESP32_IP.replace("http://", "");
+  }
+
+  // ── Service Worker ─────────────────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     const swCode = `
-      const CACHE = 'esp32-v1';
+      const CACHE = 'esp32-v2';
       self.addEventListener('install', e => {
         e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html'])));
         self.skipWaiting();
@@ -676,15 +679,14 @@
             c.match(e.request).then(r => r || fetch(e.request).then(res => { c.put(e.request, res.clone()); return res; }))
           ));
         } else if (new URL(e.request.url).hostname !== location.hostname) {
-          return; // don't intercept ESP32 API calls
+          return;
         } else {
           e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
         }
       });
     `;
     const swBlob = new Blob([swCode], { type: 'application/javascript' });
-    const swURL = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swURL).catch(() => {});
+    navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
   }
 </script>
 </body>
