@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ESP32" />
+  <meta name="theme-color" content="#0a0c0f" />
+  <title>ESP32 Control</title>
+
+  <!-- PWA Manifest inline via JS (no separate file needed) -->
+  <script>
+    const manifest = {
+      name: "ESP32 Control Panel",
+      short_name: "ESP32",
+      start_url: ".",
+      display: "standalone",
+      background_color: "#0a0c0f",
+      theme_color: "#0a0c0f",
+      icons: [
+        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%230a0c0f'/%3E%3Crect x='40' y='40' width='112' height='112' rx='8' fill='none' stroke='%2300ffa0' stroke-width='4'/%3E%3Ccircle cx='96' cy='96' r='24' fill='%2300ffa0'/%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml" }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
+    const link = document.createElement("link");
+    link.rel = "manifest";
+    link.href = URL.createObjectURL(blob);
+    document.head.appendChild(link);
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #00ffa0;
+      --blue: #00c8ff;
+      --red: #ff4060;
+      --bg: #0a0c0f;
+      --panel: #0e1117;
+      --border: #1e2a3a;
+      --text: #e0e6f0;
+      --dim: #4a6080;
+      --dimmer: #2a3a50;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-text-size-adjust: 100%;
+      overflow: hidden;
+    }
+
+    /* ── App shell ── */
+    #app {
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Grid background */
+    #app::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,255,160,0.025) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,255,160,0.025) 40px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Corner decorations */
+    .corner {
+      position: fixed;
+      width: 40px;
+      height: 40px;
+      opacity: 0.35;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .corner-tl { top: calc(var(--safe-top) + 12px); left: 12px; border-top: 2px solid var(--green); border-left: 2px solid var(--green); }
+    .corner-tr { top: calc(var(--safe-top) + 12px); right: 12px; border-top: 2px solid var(--green); border-right: 2px solid var(--green); }
+    .corner-bl { bottom: calc(var(--safe-bottom) + 12px); left: 12px; border-bottom: 2px solid var(--green); border-left: 2px solid var(--green); }
+    .corner-br { bottom: calc(var(--safe-bottom) + 12px); right: 12px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); }
+
+    /* ── Header ── */
+    .header {
+      position: relative;
+      z-index: 10;
+      padding: 16px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--panel);
+      flex-shrink: 0;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--green), var(--blue), transparent);
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green), 0 0 16px rgba(0,255,160,0.5);
+      animation: pulse 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    .status-dot.busy {
+      background: var(--blue);
+      box-shadow: 0 0 8px var(--blue);
+      animation: spin-glow 1s linear infinite;
+    }
+    .status-dot.error {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+      animation: none;
+    }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes spin-glow { 0%{opacity:1} 50%{opacity:0.5} 100%{opacity:1} }
+
+    .header-text { flex: 1; min-width: 0; }
+    .header-text h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .header-text p {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .settings-btn {
+      width: 40px;
+      height: 40px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .settings-btn:active { background: rgba(0,255,160,0.05); border-color: var(--green); color: var(--green); }
+
+    /* ── Scrollable body ── */
+    .body {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+      z-index: 2;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Program buttons ── */
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .ctrl-btn {
+      position: relative;
+      padding: 20px 16px;
+      background: #111820;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 5px;
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.12s;
+      width: 100%;
+      text-align: left;
+      overflow: hidden;
+      min-height: 80px;
+    }
+
+    .ctrl-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .btn-a::before { background: linear-gradient(135deg, rgba(0,255,160,0.08), transparent); }
+    .btn-b::before { background: linear-gradient(135deg, rgba(0,200,255,0.08), transparent); }
+
+    .ctrl-btn:active::before { opacity: 1; }
+    .ctrl-btn:active { transform: scale(0.97); }
+
+    .ctrl-btn.loading {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    .btn-id {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+    .btn-a .btn-id { color: var(--green); }
+    .btn-b .btn-id { color: var(--blue); }
+
+    .btn-label { font-size: 17px; }
+
+    /* ── Message input ── */
+    .msg-row {
+      display: flex;
+      gap: 0;
+    }
+
+    .msg-input {
+      flex: 1;
+      padding: 16px 14px;
+      background: #080b0f;
+      border: 1px solid var(--border);
+      border-right: none;
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      outline: none;
+      -webkit-appearance: none;
+      border-radius: 0;
+      letter-spacing: 0.5px;
+      transition: border-color 0.15s;
+      min-width: 0;
+    }
+    .msg-input::placeholder { color: var(--dimmer); }
+    .msg-input:focus { border-color: rgba(0,255,160,0.3); }
+
+    .send-btn {
+      padding: 16px 20px;
+      background: rgba(0,255,160,0.08);
+      border: 1px solid rgba(0,255,160,0.3);
+      color: var(--green);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.12s;
+      flex-shrink: 0;
+    }
+    .send-btn:active { background: rgba(0,255,160,0.18); }
+    .send-btn:disabled { opacity: 0.3; pointer-events: none; }
+
+    /* ── Log ── */
+    .log-box {
+      background: #080b0f;
+      border: 1px solid var(--border);
+      padding: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 10px;
+      padding: 4px 0;
+      border-bottom: 1px solid #0a0d11;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:none} }
+
+    .log-time { color: var(--dimmer); flex-shrink: 0; }
+    .log-ok   { color: var(--green); }
+    .log-err  { color: var(--red); }
+    .log-info { color: var(--blue); }
+    .log-empty { color: var(--dimmer); font-style: italic; }
+
+    /* ── IP footer ── */
+    .ip-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--dimmer);
+      text-align: center;
+      padding: 10px 0 4px;
+      letter-spacing: 1px;
+      flex-shrink: 0;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border: 1.5px solid rgba(0,255,160,0.2);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+    .spinner.blue {
+      border-color: rgba(0,200,255,0.2);
+      border-top-color: var(--blue);
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* ── Settings overlay ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .settings-sheet {
+      width: 100%;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      padding: 0 20px calc(var(--safe-bottom) + 20px);
+      transform: translateY(100%);
+      transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .overlay.open .settings-sheet {
+      transform: translateY(0);
+    }
+
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 12px auto 20px;
+    }
+
+    .sheet-title {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 16px;
+    }
+
+    .settings-field label {
+      display: block;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .settings-field input {
+      width: 100%;
+      padding: 14px;
+      background: #080b0f;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      outline: none;
+      -webkit-appearance: none;
+      border-radius: 0;
+      letter-spacing: 0.5px;
+    }
+    .settings-field input:focus { border-color: rgba(0,255,160,0.3); }
+
+    .save-btn {
+      margin-top: 16px;
+      width: 100%;
+      padding: 16px;
+      background: rgba(0,255,160,0.1);
+      border: 1px solid rgba(0,255,160,0.4);
+      color: var(--green);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .save-btn:active { background: rgba(0,255,160,0.2); }
+
+    .close-overlay {
+      position: absolute;
+      inset: 0;
+      bottom: auto;
+      height: calc(100% - 260px);
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="header-text">
+      <h1>ESP32 Control</h1>
+      <p id="headerSub">DEVICE INTERFACE · REMOTE EXECUTION PANEL</p>
+    </div>
+    <button class="settings-btn" onclick="openSettings()" aria-label="Settings">⚙</button>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+
+    <!-- Programs -->
+    <div>
+      <div class="section-label">Execution</div>
+      <div class="btn-row">
+        <button class="ctrl-btn btn-a" id="btnA" onclick="runA()">
+          <span class="btn-id" id="btnAId">0x01</span>
+          <span class="btn-label">Program A</span>
+        </button>
+        <button class="ctrl-btn btn-b" id="btnB" onclick="runB()">
+          <span class="btn-id" id="btnBId">0x02</span>
+          <span class="btn-label">Program B</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <div>
+      <div class="section-label">Display Output</div>
+      <div class="msg-row">
+        <input
+          class="msg-input"
+          id="msgInput"
+          type="text"
+          placeholder="Enter message to display..."
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          onkeydown="if(event.key==='Enter') sendMsg()"
+        />
+        <button class="send-btn" id="sendBtn" onclick="sendMsg()">Send</button>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div>
+      <div class="section-label">Activity Log</div>
+      <div class="log-box" id="logBox">
+        <div class="log-entry"><span class="log-empty">No activity yet...</span></div>
+      </div>
+    </div>
+
+    <div class="ip-tag" id="ipTag">—</div>
+  </div>
+
+  <!-- Settings overlay -->
+  <div class="overlay" id="settingsOverlay">
+    <div class="close-overlay" onclick="closeSettings()"></div>
+    <div class="settings-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Network Settings</div>
+      <div class="settings-field">
+        <label>ESP32 IP ADDRESS</label>
+        <input type="text" id="ipInput" placeholder="http://10.0.0.150" inputmode="url" />
+      </div>
+      <button class="save-btn" onclick="saveSettings()">Save &amp; Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  const DEFAULT_IP = "http://10.0.0.150";
+  let ESP32_IP = localStorage.getItem("esp32_ip") || DEFAULT_IP;
+  let loading = null;
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  document.getElementById("ipTag").textContent = ESP32_IP + " · PORT 80";
+  document.getElementById("headerSub").textContent =
+    "DEVICE INTERFACE · " + ESP32_IP.replace("http://", "");
+
+  // ── Logging ────────────────────────────────────────────────────────────────
+  function addLog(text, type = "ok") {
+    const box = document.getElementById("logBox");
+    const empty = box.querySelector(".log-empty");
+    if (empty) empty.closest(".log-entry").remove();
+
+    const now = new Date().toTimeString().slice(0, 8);
+    const entry = document.createElement("div");
+    entry.className = "log-entry";
+    entry.innerHTML = `<span class="log-time">${now}</span><span class="log-${type}">${text}</span>`;
+    box.insertBefore(entry, box.firstChild);
+
+    // Keep max 20
+    while (box.children.length > 20) box.removeChild(box.lastChild);
+  }
+
+  // ── Status dot ─────────────────────────────────────────────────────────────
+  function setStatus(state) {
+    const dot = document.getElementById("statusDot");
+    dot.className = "status-dot" + (state ? " " + state : "");
+  }
+
+  // ── Button state ───────────────────────────────────────────────────────────
+  function setLoading(id) {
+    loading = id;
+    const btnA = document.getElementById("btnA");
+    const btnB = document.getElementById("btnB");
+    const btnAId = document.getElementById("btnAId");
+    const btnBId = document.getElementById("btnBId");
+    const sendBtn = document.getElementById("sendBtn");
+
+    if (id) {
+      setStatus("busy");
+      btnA.disabled = true;
+      btnB.disabled = true;
+      sendBtn.disabled = true;
+      if (id === "A") {
+        btnA.classList.add("loading");
+        btnAId.innerHTML = '<span class="spinner"></span>RUNNING';
+      } else if (id === "B") {
+        btnB.classList.add("loading");
+        btnBId.innerHTML = '<span class="spinner blue"></span>RUNNING';
+      }
+    } else {
+      setStatus("");
+      btnA.disabled = false;
+      btnB.disabled = false;
+      sendBtn.disabled = false;
+      btnA.classList.remove("loading");
+      btnB.classList.remove("loading");
+      btnAId.textContent = "0x01";
+      btnBId.textContent = "0x02";
+    }
+  }
+
+  // ── Fetch helper ───────────────────────────────────────────────────────────
+  async function request(label, url) {
+    setLoading(label === "PROG_A" ? "A" : label === "PROG_B" ? "B" : "MSG");
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      addLog(label + " → " + data.status, "ok");
+    } catch (e) {
+      addLog(label + " → connection failed", "err");
+      setStatus("error");
+      setTimeout(() => setStatus(""), 2000);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  function runA() { request("PROG_A", ESP32_IP + "/api/programA"); }
+  function runB() { request("PROG_B", ESP32_IP + "/api/programB"); }
+
+  function sendMsg() {
+    const input = document.getElementById("msgInput");
+    const msg = input.value.trim();
+    if (!msg || loading) return;
+    input.value = "";
+    request('MSG:"' + msg + '"', ESP32_IP + "/api/display?message=" + encodeURIComponent(msg));
+  }
+
+  // ── Settings ───────────────────────────────────────────────────────────────
+  function openSettings() {
+    document.getElementById("ipInput").value = ESP32_IP;
+    document.getElementById("settingsOverlay").classList.add("open");
+  }
+
+  function closeSettings() {
+    document.getElementById("settingsOverlay").classList.remove("open");
+  }
+
+  function saveSettings() {
+    const val = document.getElementById("ipInput").value.trim().replace(/\/$/, "");
+    if (val) {
+      ESP32_IP = val.startsWith("http") ? val : "http://" + val;
+      localStorage.setItem("esp32_ip", ESP32_IP);
+      document.getElementById("ipTag").textContent = ESP32_IP + " · PORT 80";
+      document.getElementById("headerSub").textContent =
+        "DEVICE INTERFACE · " + ESP32_IP.replace("http://", "");
+      addLog("IP updated → " + ESP32_IP, "info");
+    }
+    closeSettings();
+  }
+
+  // ── Service Worker (for offline/installable PWA) ──────────────────────────
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+      const CACHE = 'esp32-v1';
+      self.addEventListener('install', e => {
+        e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html'])));
+        self.skipWaiting();
+      });
+      self.addEventListener('activate', e => {
+        e.waitUntil(caches.keys().then(keys =>
+          Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+        ));
+      });
+      self.addEventListener('fetch', e => {
+        if (e.request.url.includes('fonts.googleapis') || e.request.url.includes('fonts.gstatic')) {
+          e.respondWith(caches.open(CACHE).then(c =>
+            c.match(e.request).then(r => r || fetch(e.request).then(res => { c.put(e.request, res.clone()); return res; }))
+          ));
+        } else if (new URL(e.request.url).hostname !== location.hostname) {
+          return; // don't intercept ESP32 API calls
+        } else {
+          e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+        }
+      });
+    `;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    const swURL = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swURL).catch(() => {});
+  }
+</script>
+</body>
+</html>
